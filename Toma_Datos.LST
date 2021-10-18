@@ -1,0 +1,137 @@
+C51 COMPILER V9.01   TOMA_DATOS                                                            10/15/2012 15:46:52 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE TOMA_DATOS
+OBJECT MODULE PLACED IN Toma_Datos.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE Toma_Datos.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+*** ERROR C129 IN LINE 11 OF ADC0.H: missing ';' before 'PresAtm_MPX2100AP'
+   2          
+   3          
+   4          //struct paquete definido en main.h
+   5          
+   6          extern struct paquete vector_temp[MAX_MUESTRAS];
+   7          extern struct paquete vector_humedad[MAX_MUESTRAS];
+   8          extern struct paquete vector_presion[MAX_MUESTRAS];
+   9          
+  10          U8 status = 0x00;
+  11          /*::::::: status de datos recibios ::::::::::::::
+  12          -Parametro-------------bit-----OK----NOK---------
+  13          temperatura------------0-------1-----0-------lsb-
+  14          humedadRel-------------1-------1-----0-----------
+  15          presionAtm-------------2-------1-----0-----------
+  16          xxxxxxx----------------3-------1-----0-----------
+  17          xxxxxxx----------------4-------1-----0-----------
+  18          xxxxxxx----------------5-------1-----0-----------
+  19          xxxxxxxxx--------------6-------1-----0-----------
+  20          xxxxxxx----------------7-------1-----0-------msb-
+  21          :Nota::::::::::::::::::::::::::::::::::::::::::::
+  22          :::::::::::::::::::::::::::::::::::::::::::::::*/
+  23          
+  24          // variable global del main
+  25          extern unsigned int n_muestras;
+  26                  
+  27          // variables cargadas en configuracion() :
+  28          extern unsigned int n_muestras_total; 
+  29          extern U8 Sensor_Temp; 
+  30          extern U8 Sensor_HumddRel;
+  31          extern U8 Sensor_PresAtm; 
+  32          extern U8 Habilitacion_Mediciones; 
+  33          /*::::::: Habilitacion de Mediciones :::::::::::::
+  34          -Parametro-------------bit-----ON----OFF----------
+  35          temperatura------------0-------1-----0-------lsb-
+  36          humedadRel-------------1-------1-----0-----------
+  37          presionAtm-------------2-------1-----0-----------
+  38          xxxxxxx----------------3-------1-----0-----------
+  39          xxxxxxx----------------4-------1-----0-----------
+  40          XXXXXXXXXXX------------5-------1-----0-----------
+  41          XXXXXXXXXXXX-----------6-------1-----0-----------
+  42          xxxxxxx----------------7-------1-----0-------msb-
+  43          :::::::::::::::::::::::::::::::::::::::::::::::*/
+  44          
+  45          
+  46          
+  47          /*************************************************
+  48          Nombre: Toma_Datos
+  49          descripcion:
+  50                                  pide los datos y espera que estos lleguen luego de la comunicacion con el HW de sensores
+  51                                  para validarlos (status) .
+  52                                  Si no puede obtener los datos retorna 0 .
+  53                                  Si obtuvo los datos correctamente retorna 1     .
+  54          
+C51 COMPILER V9.01   TOMA_DATOS                                                            10/15/2012 15:46:52 PAGE 2   
+
+  55          *************************************************/
+  56          
+  57          bit Toma_Datos( void )
+  58          {
+  59          
+  60          
+  61          //  Prevencion para no desbordar los vectores de datos. 
+  62                  n_muestras %= n_muestras_total; 
+  63                                                                            //    La inicializacion, incremento y reinicio de la variable "n_muestras"...
+  64                                                                            //    ...se encuentra en el main.
+  65          
+  66          
+  67                  if( (Habilitacion_Mediciones & TEMP) && !(status & TEMP)) // Asumiendo que configuramos los parametros a 
+             -tomar en la config_medicion()
+  68                  {
+  69                          switch(Sensor_Temp)
+  70                          {
+  71                                  case _DHT11: vector_temp[n_muestras] = Temp_DHT11();
+  72                                                                   break; 
+  73                                  case _LM35: vector_temp[n_muestras] = Temp_LM35();
+  74                                                                   break;
+  75                                  default: vector_temp[n_muestras].alta = 0; 
+  76                                                                   vector_temp[n_muestras].baja = ERROR_5; // para ver error -> "Libreria.h"      
+  77                                                                   break; 
+  78                          }
+  79                  }
+  80                  if((Habilitacion_Mediciones & HUMDDrEL) && !(status & HUMDDrEL))
+  81                  {                                                                               
+  82                          switch(Sensor_HumddRel)
+  83                          {
+  84                                  case _DHT11: vector_humedad[n_muestras] = Humdd_DHT11();
+  85                                                                   break;
+  86                                  default: vector_humedad[n_muestras].alta = 0;
+  87                                                                   vector_humedad[n_muestras].baja = ERROR_6;
+  88                                                                   break;
+  89                          }
+  90                  
+  91                  }
+  92                  if( Habilitacion_Mediciones & PRESaTM && !(status & PRESaTM))
+  93                  {
+  94                          switch( Sensor_PresAtm)
+  95                          {
+  96                                  case _MPX2100AP: vector_presion[n_muestras] = PresAtm_MPX2100AP();
+  97                                                                   break;
+  98                                  default: vector_presion[n_muestras].alta = 0;
+  99                                                                   vector_presion[n_muestras].baja = ERROR_7;
+ 100                                                                   break;
+ 101                          }
+ 102                  
+ 103                  }
+ 104                          
+ 105                          
+ 106                  // Se podrian agregar otros parametros a obtener pero que estarian desactivadas en 
+ 107                  // nuestro proyecto... (ver compilacion condicional en ese caso...)
+ 108          
+ 109          
+ 110          
+ 111          
+ 112                  if( status == Habilitacion_Mediciones)  // si se tomaron todos las mediciones
+ 113                  {
+ 114                          status = 0x00; //reinicia status
+ 115                          return 1;                       // se obtuvieron los datos correctamente
+C51 COMPILER V9.01   TOMA_DATOS                                                            10/15/2012 15:46:52 PAGE 3   
+
+ 116                  }
+ 117                  else
+ 118                          return 0;                       // no se obtuvieron los datos
+ 119          }
+*** WARNING C316 IN LINE 119 OF Toma_Datos.c: unterminated conditionals
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  1 ERROR(S)

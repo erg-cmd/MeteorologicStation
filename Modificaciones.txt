@@ -1,0 +1,140 @@
+Hola gente ordene un poco la carpeta, no se enojen,
+el proyecto toma los archivos de la carpeta tpf y no de cada carpeta.
+Ahora ya encuentra todos los archivos.
+
+Mirando la hoja de datos del uc y la placa que nos da el departamento
+debido a un error que encontre vamos tener que usar todo el puerto 1
+para un teclado de 4x3
+el puerto 0 usa uart0, uart1 y T2EX; ruteados por el uc de una manera complicada
+para explicar.
+
+osea que las 4 teclas individuales no las vamos a usar porque el uc
+me dispone los pins de otra manera activando T2EX. No se asusten cuando vean
+el barrido del teclado, no le falta el teclado de 4x1 sino que no lo vamos a 
+usar y vamos a usar por completo el puerto 1 para el teclado.El teclado externo
+ya lo tengo.
+
+Ahora agrege la mdt.c y .h con un poco mas de parla para que lo miren.
+ -modifique la inicializacion(agregue timer 2 y algunas interrupciones)
+ -modifique el FW_dht11.c creo que esta bien hecho, si es así esta terminado
+ -cree FW_dht11.h donde estan las funciones y defines del .c
+ -cree el isr_timer2 para la interrupcion del timer 2 por cambio de flanco
+ -agregue todos los .h a libreria.h
+
+
+ahora estoy haciendo las funciones del lcd y el inicio del lcd.
+una vez terminado esto estamos mas cerca de probar algo....
+
+
+-----------------------------------------------------------------------------------------------------------------------------
+ Buenisimo elias, usemos este Modificaciones.txt para que escriban cada funcion que armen nueva y que hace esa funcion en detalle
+osea, porque estoy re perdido y no se en que ayudar, y honestamente me esta costando banda de tiempo enteder las funcion de DHT, 
+hoy si alguien va al campus a ver si nos juntamos asi me explica un toque porque me siento un inutil. Saludos
+
+ Mientas me puse a hacer la Verificacion de Emergencia hasta que me pueda poner al dia.
+
+ Fijense que cree un typedef U8 para cambiar todos los unsigned char! y en la verificacion de emergencia voy a necesitar algunas
+variables como n_muestras y estado. Saludos
+
+
+--------------------------------------------------------------------------------------------------------------------------------
+
+29/8 - Diego
+
+No me quedo claro si debemos poner modificaciones aca o en los archivos de cada carpeta. por las dudas pongo aca y alla.
+
+en FW_DHT11.c:
+En varios if() habia comparaciones que en realidad eran asignaciones, tipo: if( x = y), las cambie seg´n mi criterio a: if( x >= y).
+
+Consulta para Elias (igual mando un mail): en el case PIDIENDO_DATOS ¿ no deberia ser algo asi ... 
+
+	if (T2 < 20)p_data = ON;
+	else if (T2 < 45)			  
+		{...} 
+
+en vez de así:
+
+	if (T2 < 20)p_data = ON; 
+	if (T2 < 45)		  
+	{...}
+
+O sea, un if-else-if , sino supongo que entra a los dos mientras T2 < 45. 
+O estoy entendiendo mal el código. Dejo la inquietud.
+
+----------------------------------------------------------------------------------------------------------------------------------
+
+30/8 Elias
+
+Tu criterio esta muy bien, se me paso por alto que realizo una asignacion y no una comparacion. vale el mayor igual tmb.
+
+respecto al Verif_emer_detalles.txt 
+Yo pensaba en dejar activo el Wacht dog timer para ver que no se cuelgue, si se cuelga el uc se resetea de una, sino tambien
+ vamos con tu idea. La que sea mas facil.
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+1/9 Diego
+
+Maq de Timer0:
+Hice una propuesta para el desborde de la variable cuenta en el timer0 que se compone de una operacion en dicha funcion
+y una funcion en m_d_timer0. Las dos estan comentadas y espero la aprobacion de uds para descomentar y reemplazar.
+
+
+En general implemente la estructura que creó Elias para guardar los datos, lo que obligo a cambiar su definicion de lugar : de main.h a libreria.h
+
+---------------------------------------------------------------------------------------------------------------------------------
+ 1/9 Elias
+
+Diego: tu propuesta de la maquina de timers me parece bien, así uno no se maquina escribiendo tanto.
+Respecto a tu propuesta en isr_timer0, esta faltando algo. Imaginate que tenes un flag activado. Pero tu cuenta llego a 60000.
+entonces cuenta se vuelve a 0 pero el valor con el que compara el timer activado es 59xxx. Por ese lado hace agua la maquina de timer
+Osea nunca te va a dar la diferencia que necesitas.
+
+Estoy pensando en modificarlo de manera que tome el modulo de la diferencia y si es mayor la diferencia que el numero seteado por
+nosotros que tome como verdadero, es decir que el tiempo se cumplio. Ahora me pongo con eso.
+salu2 tmb me pongo con el lcd
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+4/9 Elias
+
+termine lcd.h y lcd.c, todas las rutinas estan ahí. Terminado esta, pero no probado seguramente tenemos que meter mucha mano en esto.
+las funciones importantes son: 
+ - puts_lcd() donde ustedes le pasan una cadena de caracteres de la forma = "esto es una prueba";
+pero la longitud de la cadena tiene que ser menor o igual a 32 caracteres. La cadena es guardada en buffer_lcd
+cada vez que carguen una nueva cadena en puts_lcd() borran lo que tiene el lcd en pantalla.
+ - buffer_to_lcd() funcion que levanta del buffer_lcd caracter por caracter hasta que los indices de escritura y lectura del buffer sean iguales
+hay que ver donde poner esta funcion para no alargar tanto la interrupcion del timer 0 creo que esta bastante cargada pero por el momento la ponemos ahí
+fijense si encuentran algo que les llame la atencion.
+
+salu2 
+
+----------------------------------------------------------------------------------------------------------------------------------
+
+6/9 Diego
+
+Modifique propuesta del control de desborde de la variable cuenta en tmr0 y maq_d_tmr0.
+De la manera anterior se perdian los tiempos guardados en AUX[] y se reseteaban todas las cuentas.
+
+La variable cuenta no debe ser static, sino sera visible solo desde el firm de tmr0.c . Modifique eso.
+La variable cuenta esta definida como short int, por tanto defini la variable AUX[] con el mismo tipo y cambie tambien la declaracion de cuenta en el fuente de mdt.c
+
+
+----------------------------------------------------------------------------------------------------------------------------------
+
+7/9 Diego
+
+Modifique en COMM_DHT11() en el case de PIDIENDO_DATOS lo que habiamos hablado sobre el "pulso" que pide datos, el cual dura 18 milisegundos.
+
+Tuve que agregar un caso especial en el tmr2 cuando CAP_2 < 47 para no cargar datos en la variable dato[], tambien comente el caso de CAP_2 < 5 por que queda obsoleto.
+Cualquier cosa revisenlo.
+
+----------------------------------------------------------------------------------------------------------------------------------
+10/09 Elias
+Modifique el COMM_DHT11() en el caso pidiendo datos cuando esperas los 18ms activas T2EXE y dejas de tener control sobre el pin, no le podes inducir estado lógico.
+En la parte de abajo if(20< CAP_2 <47) modifique esto por T2 debido que no va a capturar hasta que no detecte flanco descendente en T2EX y no esta habilitada.
+
+Como en este estado siempre entraba a  20<T2<47 antes que T2> 18000 agregue un flag "flag2" para que entre una vez hecho el pulso bajo. Agregue T2EXE_ON
+en la parte de abajo ya que se ha cumplido la secuencia de pedir datos, entonces podes prescindir del control sobre el pin.
+Cualquier cosa revisenlo y vemos como es mejor
+

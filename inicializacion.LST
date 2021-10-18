@@ -1,0 +1,165 @@
+C51 COMPILER V9.50a   INICIALIZACION                                                       12/12/2012 13:56:50 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE INICIALIZACION
+OBJECT MODULE PLACED IN inicializacion.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE inicializacion.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          /*-----Trabajo Prático Final-----------------------------
+   2          -----Estacion Meteorólogica------------------------------
+   3          Integrantes: Mauro Boffito, Diego Pirotta y Elias Gracia
+   4          -----modificado 05/08/2012-------------------------------
+   5          -------------------------------------------------------*/
+   6          
+   7          /*---------Includes--------------------------------------*/
+   8          
+   9          #include "libreria.h"
+  10          
+  11          
+  12          void inicializacion()
+  13          {
+  14   1       inicio_wdt();
+  15   1       inicio_oscx();
+  16   1       inicio_puertos();
+  17   1       inicio_uart0();
+  18   1       inicio_adc0();
+  19   1       inicio_timers();
+  20   1       inicio_interrupciones();
+  21   1       inicio_lcd();
+  22   1       
+  23   1      }
+  24          
+  25          /*---------Descripciones---------------------------------*/
+  26          
+  27          void inicio_wdt()
+  28          {
+  29   1              WDTCN = 0xDE;   // Deshabilito el watchdog timer
+  30   1              WDTCN = 0xAD;   // por ahora........
+  31   1      }
+  32          
+  33          //-----------------------------------------------------------
+  34          
+  35          void inicio_oscx()
+  36          {
+  37   1              unsigned int i;                                         
+  38   1              OSCXCN = 0x67;                                          //!< Configuro el registro de control del oscilador 
+  39   1                                                                                                                      //!< 01100111
+  40   1                                                                                                                      //!< Habilito el oscilador para funcionar con cristal (22.1184MHz)
+  41   1                                                                                                                      //!< Configuro el rango de trabajo del oscilador
+  42   1              
+  43   1              for (i=0; i < 256; i++);        //!< Demora "Cuidado esta demora (bloqueante) se puede hacer porque 
+  44   1                                                                                                                      //!< estoy en la inicializacion y no bloqueo ningun otro proceso!!!!
+  45   1                                                                                                                      //!< Hay que hacer esta demora para que se estabilice el oscilador
+  46   1      
+  47   1              while (!(OSCXCN & 0x80));       //!< Espero hasta que se estabilice (Cuidado es bloqueante!!)
+  48   1      
+  49   1              OSCICN = 0x88;                                          //!< Configuro el oscilador interno
+  50   1                                                                                                                      //!< 10001000
+  51   1                                                                                                                      //!< Configuro el micro para utilizar el oscilador externo
+  52   1      
+  53   1              while (!(OSCXCN & 0x80));       //!< Espero hasta que se estabilice (Cuidado es bloqueante!!)
+  54   1      
+  55   1              OSCICN = 0x08;                                          //!< Configuro el oscilador interno
+C51 COMPILER V9.50a   INICIALIZACION                                                       12/12/2012 13:56:50 PAGE 2   
+
+  56   1                                                                                                                      //!< 00001000
+  57   1                                                                                                                      //!< Configuro el micro para utilizar el oscilador externo
+  58   1      }
+  59          
+  60          //------------------------------------------------------------
+  61          
+  62          void inicio_puertos()
+  63          {
+  64   1                                                                                                                      //!< Seteo para pulsadores      (0 = Open-Drain \ 1 = Push-Pull)
+  65   1              P0MDOUT = 0xFF;                                         //!< Puerto 0 como salida
+  66   1              P1MDOUT = 0x63;                                         //Configuro todo el puerto1  0110 0011
+  67   1              P2MDOUT = 0xF0;                                         //!< Puerto 2 como salida nibble bajo / entrada nibble alto.
+  68   1              P2 = 0xFF;                                                              //!< Seteo el puerto en 1
+  69   1              P74OUT = 0xFB;                                          //!<1111 1011 Todo salida menos P5.3-0
+  70   1              XBR0 = 0x04;                                                    //!< Ruteo pins P0.0 y P0.1 a la Uart0
+  71   1              XBR2 = 0x44;                                                    //!<Ruteo pins P0.2 y P0.3 a la uart1; 
+  72   1                                                      //!<Habilito la crossbar y habilito lo pull ups
+  73   1      }
+  74          
+  75          //------------------------------------------------------------
+  76          
+  77          void inicio_uart0()
+  78          {
+  79   1              SCON0 = 0x50;                                           //!< Inicio en modo 1 ( baud rate determinado por el timer 1)
+  80   1              PCON |= 0x80;                                                   //!< SMOD en 1, 
+  81   1              TH1 = t_timer1;                                         //!< cargo el timer 1
+  82   1              TL1 = t_timer1;                                         //!< recarga del timer 1
+  83   1              TR1 = ON;                                                                       //!< enciendo el timer 1
+  84   1                                                                                                                      //!< Lo inicio acá porque no genera interrupciones
+  85   1      }
+  86          
+  87          //------------------------------------------------------------
+  88          
+  89          void inicio_adc0()
+  90          {
+  91   1        AMX0CF = 0; // Single-Ended. 
+  92   1        ADC0CF = 0x27; // AD0SC = 4; CLKsar = 2.12Khz; Ganancia = 1;
+  93   1        AMX0SL = 0x01; // Seleccionado por defecto AIN0.1
+  94   1        REF0CN = 0x02; // Enciendo el generador externo VREF0 
+  95   1        ADC0CN = 0xC0; // Enable - Reset de Busy, Int - Modo: 00 - Right Justified.
+  96   1      }
+  97          
+  98          //------------------------------------------------------------
+  99          
+ 100          void inicio_timers()
+ 101          {       
+ 102   1              
+ 103   1                                                                                      //!< CKCON por defecto esta en 0x00
+ 104   1                                                                                      //!< por lo que divide al clock por 12 
+ 105   1              TMOD = 0x21 ;                                           //!< Timer 0 en modo 16 bits y Timer 1 
+ 106   1                                                                                      //!< en modo 8 bits con recarga         
+ 107   1              TH0     = t_100us_l;                                    //!< cargo el timer 0 para que desborde cada 
+ 108   1              TL0 = t_100us_h;                                        //!< 100us
+ 109   1      }
+ 110          
+ 111          //------------------------------------------------------------
+ 112          
+ 113          void inicio_interrupciones()
+ 114          {
+ 115   1              EIE2 = 0x02; // habilito interrupcion por conversion ADC0
+ 116   1              ES0  = ON;      //habilito la interrupcion por puerto serie
+ 117   1              TF0 = OFF ;     //borro el flag de desborde timer 0
+C51 COMPILER V9.50a   INICIALIZACION                                                       12/12/2012 13:56:50 PAGE 3   
+
+ 118   1              ET0 = ON ;      //habilito la interrupcion por desborde timer 0
+ 119   1              //TF2 = OFF;    //borro el flag de deborde      timer 2
+ 120   1              //ET2 = ON;     //habilito la interrupcion del timer 2
+ 121   1              EA  = ON ;  //habilito la interrupcion global
+ 122   1      
+ 123   1      }
+ 124          
+ 125          //------------------------------------------------------------
+ 126          
+ 127          void inicio_lcd()
+ 128          {
+ 129   1       P4 = 0; P5 = 0;                                                //!< reseteo port 4 y 5
+ 130   1       lcd_init();                                                    //!< rutina de inicio 
+ 131   1       wrt_cmd(LCD_CLEAR);                                    //!< parte de la rutina de inicio
+ 132   1       cursorxy(1,1);                                                 //!< muevo el cursor a la posicion 1,1
+ 133   1                                                                                      //!< no se para que... porque el comando anterior
+ 134   1                                                                                      //!< te manda el cursor a esa posicion, pero por las
+ 135   1                                                                                      //!< dudas lo dejo así 
+ 136   1      }
+ 137          
+ 138          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    162    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

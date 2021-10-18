@@ -1,0 +1,31 @@
+C51 COMPILER V9.50a   ADC0                                                                 12/12/2012 13:56:51 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE ADC0
+OBJECT MODULE PLACED IN adc0.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE adc0.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+   2          
+   3          
+   4          void isr_adc0(void) interrupt 15
+   5          {
+   6   1              AD0INT = OFF;           //!< borro el flag
+   7   1      }
+   8          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =      3    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

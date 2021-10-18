@@ -1,0 +1,141 @@
+C51 COMPILER V9.01   VERI_EMERGENCIA                                                       11/20/2012 01:57:14 PAGE 1   
+
+
+C51 COMPILER V9.01, COMPILATION OF MODULE VERI_EMERGENCIA
+OBJECT MODULE PLACED IN veri_emergencia.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE veri_emergencia.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+   2          
+   3          
+   4          
+   5          extern U8 estado;
+   6          extern U8 n_muestras;
+   7          //extern U8 flag_Config-_Veri;                                                            //__Esto mas que nada es ponerse a pensar que mierda podria salir 
+             -mal.__
+   8          extern U8 flag_check_toma;                                                      //guarda que esa pregunta es peligrosa
+   9          extern U8 veri_check;
+  10          
+  11          void Verificacion_Emergencia (U8 estado_actual)
+  12          {
+  13   1         U8 verificando;
+  14   1         verificando = estado_actual;
+  15   1         U8 cuenta_check = 0;
+*** ERROR C141 IN LINE 15 OF VERI_EMERGENCIA.C: syntax error near 'U8'
+*** ERROR C202 IN LINE 15 OF VERI_EMERGENCIA.C: 'cuenta_check': undefined identifier
+  16   1         U8 n_muestras_aux;
+*** ERROR C141 IN LINE 16 OF VERI_EMERGENCIA.C: syntax error near 'U8'
+*** ERROR C202 IN LINE 16 OF VERI_EMERGENCIA.C: 'n_muestras_aux': undefined identifier
+  17   1      
+  18   1         Clear_LCD ();                                        //Armar Funcion!
+  19   1              
+  20   1              switch (verificando)
+  21   1              {
+  22   2                    case CONFIG_MEDICION:                             // Lo pense en el caso de que se quisiera re configur
+             -ar, le diria primero al operador
+  23   2                                                                                                      // los dispositivos que estan siendo usados. Tambien voy a ver de ponerlo que se
+             - inicie 
+  24   2                                                 {   
+  25   3                                                         printLCD ("Bienvenido a su Estacion Meteorologica");
+  26   3                                                     if(flag_Config_Veri == ON)       // con un flag la primera ves que corre el programa y se configura.
+  27   3                                                     {
+  28   4                                                          printLCD ("Sensores:");
+  29   4      
+  30   4                                                     if (Habilitacion_Mediciones == 0x00)
+  31   4                                                               { printLCD ("No se han registrado dispositivos");
+  32   5                                                                 return;                                         
+  33   5                                                               }
+  34   4                                                         
+  35   4                                                         if ((Habilitacion_Mediciones != 0x01) && (Habilitacion_Mediciones != 0x02) && (Habilitacion_Medic
+             -iones != 0x04))
+  36   4                                                                      printLCD ("Error en la Conexion de Dispositivos, Comuniquese con el Servicio Tecnico      Error: 0
+             -003");
+  37   4      
+  38   4                                                         if (Habilitacion_Mediciones === 0x01)
+  39   4                                                           {if(Sensor_Temp == _DHT11)
+  40   5                                                                 printLCD ("Temperatura: DHT11");              
+  41   5                                                                if(Sensor_Temp == _LM35)
+  42   5                                                                 printLCD ("Temperatura: LM35");
+  43   5                                                                       else
+  44   5                                                                 printLCD ("Temperatura: Unknown");
+  45   5                                                                }
+  46   4                                                                  else
+C51 COMPILER V9.01   VERI_EMERGENCIA                                                       11/20/2012 01:57:14 PAGE 2   
+
+  47   4                                                                { printLCD ("Temperatura: No registrado");
+  48   5                                                                }
+  49   4                                                         
+  50   4                                                         
+  51   4                                                         if (Habilitacion_Mediciones === 0x02)
+  52   4                                                           {if(Sensor_HumddRel == _DHT11)
+  53   5                                                                 printLCD ("Humedad: DHT11");
+  54   5                                                                if(Sensor_HumddRel == _HIH4000)
+  55   5                                                                 printLCD ("Humedad: HIH4000");
+  56   5                                                                       else
+  57   5                                                                 printLCD ("Humedad: Unknown");
+  58   5                                                                }
+  59   4                                                                  else
+  60   4                                                                { printLCD ("Humedad: No registrado");
+  61   5                                                                }
+  62   4      
+  63   4      
+  64   4                                             if (Habilitacion_Mediciones === 0x04)
+  65   4                                                           {if(Sensor_PresAtm == _MPX2100AP)
+  66   5                                                                 printLCD ("Presion: MPX2100AP");                                             
+  67   5                                                                       else
+  68   5                                                                 printLCD ("Humedad: Unknown");
+  69   5                                                                }
+  70   4                                                                  else
+  71   4                                                                { printLCD ("Humedad: No registrado");
+  72   5                                                                }
+  73   4      
+  74   4                                                         return;
+  75   4                                                                }
+  76   3                                                                 
+  77   3                                                 } break;
+  78   2      
+  79   2                          
+  80   2                              case TOMA_DATOS:                                                         
+  81   2                                                      {  
+  82   3                                                         n_muestras_aux = n_muestras; 
+  83   3                                                        
+  84   3                                                        if(n_muestras_aux == n_muestras)
+  85   3                                                          {                                                                                                    
+  86   4                                                                 flag_check_toma = ON;     //encendemos flag del timer.
+  87   4                                                                 cuenta_check++;
+  88   4                                                                 return;                                                                                                              
+  89   4                                                          }
+  90   3                                                                 else
+  91   3                                                              {
+  92   4                                                                 flag_check_toma = OFF;
+  93   4                                                                 cuenta_check = 0;
+  94   4                                                              }
+  95   3                                                       if (cuenta_check > 50)        // Valor al azar.
+  96   3                                                              { status = reset;          // Define reset 0x00
+  97   4                                                                printLCD ("Error en el procesamiento de Datos, Comuniquese con el servicio Tecnico      Error: 00
+             -04");
+  98   4                                                                cuenta_check = 0;
+  99   4                                                              }
+ 100   3                                                       if(veri_check > 10)               //El DHT11 tuvo 10 veces seguidas error de CheckSUM.
+ 101   3                                                          { status = reset;
+ 102   4                                                                printLCD ("Error en el prosesamiento de Datos, Comuniquese con el servicio Tecnico      Error: 00
+             -02");
+ 103   4                                                                cuenta_check = 0;
+ 104   4                                                       
+ 105   4                                                       if(veri_start > 10)              //El DHT11 no pudo levantar la trama correctamente 10 veces.
+ 106   4                                                               printLCD  ("Error en la comunicacion con el Dispositivo: _DHT11, Comuniquese con el servicio Tecni
+C51 COMPILER V9.01   VERI_EMERGENCIA                                                       11/20/2012 01:57:14 PAGE 3   
+
+             -co      Error: 0003");
+ 107   4      
+ 108   4      
+ 109   4      
+ 110   4      
+ 111   4                                                          }     
+ 112   3                                    }break;
+ 113   2                }
+ 114   1      }                                                                                          
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  4 ERROR(S)

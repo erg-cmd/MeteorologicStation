@@ -1,0 +1,124 @@
+C51 COMPILER V9.50a   MAIN                                                                 12/12/2012 13:56:50 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE main.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          /*--------Trabajo Prático Final-------------------------*/
+   2          //-------Estacion Meteorólogica---------------------------
+   3          //Integrantes: Mauro Boffito, Diego Pirotta y Elias Gracia
+   4          //-----modificado 05/08/2012------------------------------
+   5          /*------------------------------------------------------*/
+   6          
+   7          #include "libreria.h"
+   8          
+   9          //Variables Externas
+  10          extern bit timer_100us;
+  11          extern bit timer_500us;
+  12          extern bit timer_1ms;
+  13          extern bit timer_2ms;
+  14          extern bit timer_5ms;
+  15          extern bit timer_10ms;
+  16          extern bit timer_1s;
+  17          extern U16      AUX[];
+  18          
+  19          extern U8 n_de_muestras;                                                                //!< definida en config_medicion.c
+  20          extern U8 datos_ingresados;
+  21          extern bit timer_1s;                                                                            //!< definida en mdt.c
+  22          extern bit flag_actualizar;                                                             //!< definida en tomar_muestra.c
+  23          
+  24          /*------Variables---------------------------------------*/
+  25          
+  26          bit flag_tomarMuestra = OFF;                    //!< cuando esta en ON paso el tiempo entre muestras, indicando la toma mue
+             -stra 
+  27          U8 estado = CONFIG_MEDICION;
+  28          U8 tick_muestra = 0;
+  29          U8 tecla = NO_KEY;
+  30          U8 temperatura = 0;
+  31          U8 temp_dht11 = 0;
+  32          U8 humedad_dht11 = 0;
+  33          U8 presion = 0;
+  34          U8 numerOdByte = 0;
+  35          U8 el_buffer[15] = {'\0','\0','\0','\0','\0','\0','\0','\0','\0','\0','\0','\0','\0','\0','\0'};
+  36          
+  37          /*------------------------------------------------------*/
+  38          
+  39          void main ()
+  40          {
+  41   1         inicializacion();
+  42   1         TR0 = ON;                                                    //!<inicio el timer 0
+  43   1         TR2 = ON;                                                    //!<inicio el timer 2
+  44   1         while(1)
+  45   1         {
+  46   2         switch (estado)
+  47   2         {
+  48   3                                      case CONFIG_MEDICION:
+  49   3                                               config_medicion();                                                     //!< si se pulso alguna tecla accede a configurar
+  50   3                                                                                                                                      //!< de lo contrario retorna
+  51   3                                               if(flag_actualizar == ON)
+  52   3                                               {
+  53   4                                                      flag_actualizar = OFF;
+  54   4                                                      estado = TOMA_DE_DATOS;
+C51 COMPILER V9.50a   MAIN                                                                 12/12/2012 13:56:50 PAGE 2   
+
+  55   4                                                      break;
+  56   4                                               }
+  57   3                                               if(datos_ingresados != VACIO)                          //!< si se configuro anteriormente corre la ultima config
+  58   3                                               {
+  59   4                                                      estado = ENVIO_DE_CONFIG;                               //!< se encontro config anterior y la enviamos a la PC
+  60   4                                               }
+  61   3                                      break;
+  62   3      
+  63   3                                      case ENVIO_DE_CONFIG:                                                   //!< hasta que no se envie la configuracion no
+  64   3                                                                                                                                      //!< no empiezo a tomar datos
+  65   3                                              envio_de_config();
+  66   3                                              
+  67   3                                      break;
+  68   3                                                                      
+  69   3                                      
+  70   3                                      case TOMA_DE_DATOS:
+  71   3                                               
+  72   3                                      //!< en TOMA_DE_DATOS:  -espero al tiempo entre muestras para tomar las mediciones.
+  73   3                                      //!<                                    -Si se llegó al número de muestras total, cambio al siguente estado     el envio de datos. 
+  74   3                                      //!<                                    -Me fijo si no llego configuracion nueva desde la PC
+  75   3                                      //!<                                    -Me fijo si el teclado es presionado
+  76   3      
+  77   3                                      actualizar();                                                           //!< refresca el valor de ticks y si llego a t_entre_muestras setea flag_tomarMue
+             -stras
+  78   3                                                                                                                              //!< actualiza el valor de tecla cada 1 segundo; si tecla apretada estado = CONFIG_MEDICION
+  79   3                                      RecibirTrama();                                                         //!< nos fijamos si llego nueva configuracion al uc; responde con Ack o Nack
+  80   3                                       if( flag_tomarMuestra )                                //!< pregunto si es tiempo de tomar la muestra
+  81   3                                       {
+  82   4                                              tomar_muestra();
+  83   4                                              flag_tomarMuestra = OFF;                //!< se reinicia flag para nueva cuenta del timer0
+  84   4                                              estado = ENVIO_DE_DATOS;
+  85   4                                              break;
+  86   4                                       }
+  87   3                                      
+  88   3                                      break;
+  89   3                                              
+  90   3                                      case ENVIO_DE_DATOS:                            
+  91   3      
+  92   3                                       envio_datos();                                         //!< hasta no enviar todos los datos no continuar
+  93   3                                       
+  94   3                                      break;   
+  95   3              }
+  96   2         }
+  97   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     73    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     23    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

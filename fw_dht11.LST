@@ -1,0 +1,206 @@
+C51 COMPILER V9.50a   FW_DHT11                                                             12/12/2012 13:56:51 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE FW_DHT11
+OBJECT MODULE PLACED IN fw_dht11.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE fw_dht11.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+   2          
+   3          extern U16 AUX[];
+   4          extern bit timer_5ms;   //definido en mdt.c
+   5          extern U8  numerOdByte;         //definida en main.c
+   6          extern U8  humedad_dht11;//definida en main.c
+   7          extern U8  temp_dht11;  //definida en main.c
+   8          extern U8  el_buffer[]; //definida en main.c
+   9          
+  10          //------Variables globales-----------------------
+  11          
+  12          U16 AUXILIAR = 0;
+  13          U8 indice = 7, cant_de_bits = 0;
+  14          bit estado_anterior = OFF, estado_actual = OFF;
+  15          sfr16 T2    =   0xCC;   
+  16          
+  17          /*----------------------------------------*/
+  18          
+  19          void Medicion_DHT11( void )
+  20          {       
+  21   1              if( COMM_DHT11() )
+  22   1              {
+  23   2                      //wrt_string("ERROR COMM");
+  24   2                      humedad_dht11 = el_buffer[0];
+  25   2                      temp_dht11 = el_buffer[2];
+  26   2              }
+  27   1              else
+  28   1              { 
+  29   2                      //wrt_string("TRAMA OK!");
+  30   2                      humedad_dht11 = el_buffer[0];
+  31   2                      temp_dht11 = el_buffer[2];
+  32   2              }
+  33   1      
+  34   1      }
+  35          
+  36          bit COMM_DHT11 (void)
+  37          {
+  38   1              U8 estado_DHT11 = OCIOSO;
+  39   1              bit flag = ON, comunicacion = ON;
+  40   1              indice = 7, cant_de_bits=0; 
+  41   1              estado_anterior = OFF, estado_actual = OFF;
+  42   1              el_buffer[0] = 0;
+  43   1              el_buffer[1] = 0;
+  44   1              el_buffer[2] = 0;
+  45   1              el_buffer[3] = 0;
+  46   1              el_buffer[4] = 0;
+  47   1       //globales
+  48   1              AUXILIAR = 0;numerOdByte = 0;
+  49   1       
+  50   1       /*-Descripcion de varibles-------
+  51   1       contador: lleva la cuenta de los bits recibidos
+  52   1       datos: un array de 5 donde se guarda humedad_entera, hum_decimal, temp_entera,temp_decimal, chksm
+  53   1                      en ese orden.
+  54   1       ---------------------------------*/ 
+  55   1        
+C51 COMPILER V9.50a   FW_DHT11                                                             12/12/2012 13:56:51 PAGE 2   
+
+  56   1        while(comunicacion)
+  57   1        {
+  58   2         switch(estado_DHT11)
+  59   2         {
+  60   3                              case OCIOSO:
+  61   3                                       if(medir)
+  62   3                                       {
+  63   4                                              estado_DHT11 = PIDIENDO_DATOS;
+  64   4                                              flag = ON; 
+  65   4                                       }
+  66   3                              break;
+  67   3                              
+  68   3                              case PIDIENDO_DATOS:                              
+  69   3                                       
+  70   3                                                        //----------seteo del puerto
+  71   3                                       if (flag)//debe pasar una sola vez por acá, por eso el flag
+  72   3                                       {
+  73   4                                        p_data = OFF;
+  74   4                                        T2 = 0;                 //reseteo la cuenta del timer 2
+  75   4                                        flag = OFF;      //una vez iniciado, apago el flag
+  76   4                                       }
+  77   3                                       if (T2 > 18000)        //Bajo p_data hasta 18ms
+  78   3                                       {
+  79   4                                              p_data = ON; //Levanto P_data por 25us
+  80   4                                              P2MDOUT &=0xFE; //seteo como salida P2.0 
+  81   4                                              T2 = 0;
+  82   4                                              estado_DHT11 = SINCRONIZACION;
+  83   4                                       }
+  84   3                                       break;
+  85   3                              
+  86   3                              case SINCRONIZACION:
+  87   3                                      
+  88   3                                      timer_5ms_on;
+  89   3                                      while(p_data && timer_5ms == ON); //!<espero que el DHT11 me conteste
+  90   3                                                                       //!<son unos 80us en bajo      
+  91   3                                       while(!p_data && timer_5ms == ON); //!<espero que el DHT11 me conteste
+  92   3                                                                       //!<son unos 80us en bajo      
+  93   3                                       while(p_data && timer_5ms == ON); //!<espero que el DHT11 me conteste
+  94   3                                                                       //!<son unos 80us en alto      
+  95   3                                        T2 = 0;                         //Reinicio el timer 2
+  96   3                                       estado_DHT11 = RECIBIENDO_DATOS; //cambio al sig estado
+  97   3                                       timer_5ms_on; //Inicio la cuenta de 5 ms; tiempo limite de comunicacion
+  98   3                              break;
+  99   3                              
+ 100   3                              case RECIBIENDO_DATOS:
+ 101   3                                       recibiendo_bit();
+ 102   3                                       if(timer_5ms == OFF)   //chequeo si pasaron los 5ms
+ 103   3                                       {
+ 104   4                                              //wrt_data(48+(cant_de_bits/10));
+ 105   4                                       //wrt_data(48+(cant_de_bits%10));
+ 106   4                                        estado_DHT11 = CHEQUEO;
+ 107   4                                       }       
+ 108   3                              break;
+ 109   3                              
+ 110   3                              case CHEQUEO:
+ 111   3                                       estado_DHT11 = OCIOSO;
+ 112   3                                       if (el_buffer[4] == (el_buffer[3] + el_buffer[2] + el_buffer[1] + el_buffer[0]))
+ 113   3                                       {
+ 114   4                                        return DHT11_COMM_OK; // se levanto la trama correctamente
+ 115   4                                       }
+ 116   3                                       else //la trama no verifica el checksum
+ 117   3                                       {
+C51 COMPILER V9.50a   FW_DHT11                                                             12/12/2012 13:56:51 PAGE 3   
+
+ 118   4                                        return DHT11_COMM_ERROR;      //problemas de comunicacion con  el DHT11 
+ 119   4                                       }
+ 120   3                              break;
+ 121   3         }
+ 122   2        }
+ 123   1      }
+ 124          
+ 125          /*---Funciones-------------------*/
+ 126          
+ 127          /*--------------------------------------------------
+ 128           
+ 129                  si es un "0" el periodo es de 78us, divido 1.085us (tiempo de la cuenta) = 71.88
+ 130                  si es un "1" el periodo es de 120us, divido 1.085us (tiempo de la cuenta) = 110.6
+ 131            
+ 132           El bit recibido es el mas significativo;
+ 133           --------------------------------------------------*/ 
+ 134          
+ 135          
+ 136          void recibiendo_bit()
+ 137          {
+ 138   1                      estado_actual = p_data;
+ 139   1      
+ 140   1                      if(estado_actual == estado_anterior) return; //no hubo cambios
+ 141   1       
+ 142   1                      if((estado_actual == ON) && (estado_anterior == OFF)) 
+ 143   1                      {
+ 144   2                              estado_anterior = estado_actual;
+ 145   2                              return;
+ 146   2                      }
+ 147   1       
+ 148   1                      if((estado_actual == OFF) && (estado_anterior == ON))
+ 149   1                      {
+ 150   2                              AUXILIAR = T2;  //!<copio el valor 
+ 151   2                              T2 = 0;         //!<reseteo la cuenta
+ 152   2                              estado_anterior = estado_actual;
+ 153   2                              if (AUXILIAR < 135)
+ 154   2                              {
+ 155   3                                                      if(AUXILIAR < 90)
+ 156   3                                                      {
+ 157   4                                                      el_buffer[numerOdByte] |= 0<<indice; // es un 0 
+ 158   4                                                      }
+ 159   3                                                      else
+ 160   3                                                      {                 
+ 161   4                                                      el_buffer[numerOdByte] |=  1<<indice; // es un 1
+ 162   4                                                      }
+ 163   3                              cant_de_bits++; //cuenta los bits recibidos
+ 164   3                       
+ 165   3                                                      if (indice == 0) 
+ 166   3                                                      {
+ 167   4                                                              numerOdByte++; 
+ 168   4                                                              indice = 7;
+ 169   4                                                      }
+ 170   3                                                      else
+ 171   3                                                      {
+ 172   4                                                      indice--;
+ 173   4                                                      }
+ 174   3                              }
+ 175   2                      }
+ 176   1      }
+*** WARNING C291 IN LINE 123 OF fw_dht11.c: not every exit path returns a value
+
+
+C51 COMPILER V9.50a   FW_DHT11                                                             12/12/2012 13:56:51 PAGE 4   
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    337    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2       2
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  0 ERROR(S)

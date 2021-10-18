@@ -1,0 +1,54 @@
+C51 COMPILER V9.50a   ISR_UART0                                                            12/12/2012 13:56:51 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE ISR_UART0
+OBJECT MODULE PLACED IN isr_uart0.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE isr_uart0.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+   2          
+   3          extern U8 buffer_Rx[];
+   4          extern U8 buffer_Tx[];
+   5          extern U8 in_tx,out_tx,in_rx,out_rx;
+   6          
+   7          void isr_uart0() interrupt 4
+   8          {
+   9   1       if (RI0) // interrupcion por dato recibido
+  10   1       {
+  11   2        buffer_Rx[in_rx] = SBUF0;
+  12   2        in_rx++;
+  13   2        in_rx %= TAM_RX;
+  14   2        RI0 = OFF;            //!< borramos el flag por byte recibido
+  15   2       }
+  16   1       
+  17   1       //!<Si la interrupcion es por transmision (se termino de mandar un dato)
+  18   1              if ( TI0 )
+  19   1              {
+  20   2                      TI0 = 0;
+  21   2                      //!<Solo mando un dato si el indice out_tx todavia no alcanzo a in_tx:
+  22   2                      if ( in_tx != out_tx )
+  23   2                      {
+  24   3                              SBUF0 = buffer_Tx[out_tx];
+  25   3                              out_tx++;
+  26   3                              out_tx %= TAM_TX;
+  27   3                      }
+  28   2              }
+  29   1       }
+  30          
+  31          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     73    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,407 @@
+C51 COMPILER V9.50a   CONFIG_MEDICION                                                      12/12/2012 13:56:51 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE CONFIG_MEDICION
+OBJECT MODULE PLACED IN config_medicion.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE config_medicion.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+   2          
+   3          /*::::::: status de datos_ingresados ::::::::::::
+   4          -Parametro-------------bit-----OK----NOK---------
+   5          temperatura------------0-------1-----0-------lsb-
+   6          humedadRel-------------1-------1-----0-----------
+   7          presionAtm-------------2-------1-----0-----------
+   8          xxxxxxx----------------3-------1-----0-----------
+   9          xxxxxxx----------------4-------1-----0-----------
+  10          nº muestras------------5-------1-----0-----------
+  11          tiempo e/ muestras-----6-------1-----0-----------
+  12          xxxxxxx----------------7-------1-----0-------msb-
+  13          :Nota::::::::::::::::::::::::::::::::::::::::::::
+  14          ::  En datos_ingresados solo se guarda si se   ::
+  15          :: pudo configurar o no, pero no el valor      :: 
+  16          :: de esa configuracion.                       ::
+  17          :::::::::::::::::::::::::::::::::::::::::::::::*/
+  18          
+  19          
+  20          extern bit flag_actualizar;                                     // variable definida en tomar_muestra.c
+  21          extern U16 AUX[];                                                       // variable definida en mdt.c
+  22          extern bit timer_2500us;                                        // variable definida en mdt.c
+  23          extern bit timer_1s;                                            // variable definida en mdt.c
+  24          extern bit timer_5s;                                            // variable definida en mdt.c
+  25          extern U8 estado;                                                       // variable definida en main.c
+  26          extern U8 tecla;                                        // variable definida en main.c
+  27          extern U8 el_buffer[];                                  // array definido en main.c
+  28          U8 n_de_muestras = N_MUESTRAS_DEFECTO;                          // numero de muestras a tomar antes del envio
+  29          U8 t_entre_muestras = T_ENTRE_MUESTRAS_DEFECTO;         // intervalo de tiempo entre toma de muestras
+  30          U8 datos_ingresados = 0x00;
+  31          U8 Habilitacion_Mediciones = 48;
+  32          
+  33          /*--------------------------------------------------------*/
+  34          
+  35          code U8 mensaje1[17] = {'1','-','°','C','[',' ',']',' ','2','-','R','H','%','[',' ',']','\0'};
+  36          code U8 mensaje2[17] = {'3','-','h','P','a','[',' ',']',' ','6','-',' ','>','>',' ',' ','\0'};
+  37          code U8 mensaje3[17] = {'1','-',' ',' ','<','<',' ',' ',' ','2','-','O','K','!',' ',' ','\0'};
+  38          code U8 mensaje4[17] = {'3','-','S','a','l','i','r',' ',' ',' ',' ',' ',' ',' ',' ',' ','\0'};
+  39          
+  40          /**
+  41           *      \fn void config_medicion ( void )
+  42           *      \brief setea parametro de medicion si antes no encuentra una configuracion previa
+  43           *      \param void
+  44           *      \return void
+  45           */
+  46          
+  47          void config_medicion()
+  48          {
+  49   1              if ( flag_actualizar == ON )                    //!< flag activado en actualizar(), corremos la configuracion 
+  50   1              {
+  51   2                      menu_display();
+  52   2                      return;
+  53   2              }                       
+  54   1              
+  55   1              actualizar_teclado();                                   //!< actualiza el valor de tecla cada 2.5ms
+C51 COMPILER V9.50a   CONFIG_MEDICION                                                      12/12/2012 13:56:51 PAGE 2   
+
+  56   1              
+  57   1              if( Teclado() != NO_KEY )                               //!< si se apretó el teclado
+  58   1              {
+  59   2                      menu_display();                                         //!<corremos el menu en el display
+  60   2              }                                                                               //!< sinó retornamos de la función
+  61   1      }
+  62          
+  63          /*---Desarrollo de las funciones-----------------*/
+  64          
+  65          /**
+  66           *      \fn void menu_display ( void )
+  67           *      \brief mostramos el menu de configuracion; tiempo para apretar una tecla es 5 segundos
+  68           *      \param void
+  69           *      \return void
+  70           */
+  71          
+  72          void menu_display()
+  73          {
+  74   1        bit atras_menu = OFF;                                                         //!< flag para retornar al menu anterior
+  75   1        wrt_cmd(LCD_CLEAR);                                                           //!< Borramos la pantalla
+  76   1        wrt_string(" Configuracion:");                                        //!< "Configuracion"
+  77   1        cursorxy(2,1);                                                                        //!< corremos el cursor a la segunda fila
+  78   1        wrt_string("1-Setear 2-Salir");                                       //!< "1-Setear 2-Salir"
+  79   1        timer_5s_on;                                                                          //!< activamos el timer de 5 segundos, el usuario tiene 5 segundos
+  80   1        while(timer_5s == ON)                                                         //!< para apretar cualquier tecla, sino sale del menu
+  81   1        {  
+  82   2              actualizar_teclado();                                           //!< actualiza el valor de tecla cada 2.5ms
+  83   2              switch( Teclado() )
+  84   2              {
+  85   3                                               case 1:                                                                //!< Se eligió la configuracion
+  86   3                                                              timer_5s_on;                                    //!< se ha pulsado una tecla, +5 segundos
+  87   3                                                              wrt_cmd(LCD_CLEAR);                             //!< borramos la pantalla
+  88   3                                                              wrt_string(mensaje1);                   //!< "1-²C[ ] 2-RH%[ ]"
+  89   3                                                              cursorxy(2,1);                                  //!< corremos el cursor a la segunda fila
+  90   3                                                              wrt_string(mensaje2);                   //!< "3-hPa[ ] 6- ->> "
+  91   3                                                              if(Habilitacion_Mediciones & TEMP)
+  92   3                                                              {
+  93   4                                                               cursorxy(1,6);
+  94   4                                                               wrt_data('X');
+  95   4                                                              }
+  96   3                                                              if(Habilitacion_Mediciones & HUMDDrEL)
+  97   3                                                              {
+  98   4                                                               cursorxy(1,15);
+  99   4                                                               wrt_data('X');
+ 100   4                                                              }
+ 101   3                                                              if(Habilitacion_Mediciones & PRESaTM)
+ 102   3                                                              {
+ 103   4                                                               cursorxy(2,7);
+ 104   4                                                               wrt_data('X');
+ 105   4                                                              }       
+ 106   3                                                              while(timer_5s == ON)
+ 107   3                                                              {
+ 108   4                                                               actualizar_teclado();      //!< actualiza el valor de tecla cada 2.5ms
+ 109   4                                                                                                                      //!< actualiza selecciones anteriores de parametros en pantalla
+ 110   4                                                               switch( Teclado() )
+ 111   4                                                               {
+ 112   5                                                                              case 1:                                                                 //!< ON/OFF medir temperatura
+ 113   5                                                                                              tildar_casilla(TEMP);                   //!< escribo en fila 1, columna 5 'X' y 
+ 114   5                                                                                                                                                              //!< se presiono una tecla, + 5 segundos
+ 115   5                                                                              break;
+ 116   5                                                                              
+ 117   5                                                                              case 2:                                                                 //!<  ON/OFF medir humedad
+C51 COMPILER V9.50a   CONFIG_MEDICION                                                      12/12/2012 13:56:51 PAGE 3   
+
+ 118   5                                                                                              tildar_casilla(HUMDDrEL);               //!< escribo en fila 1, posicion 14 'X'
+ 119   5                                                                                                                                                              //!< se presiono una tecla, + 5 segundos
+ 120   5                                                                              break;
+ 121   5                                                                              
+ 122   5                                                                              case 3:                                                                 //!< ON/OFF medir presion
+ 123   5                                                                                              tildar_casilla(PRESaTM);                //!< escribo en fila 2, posicion 6 'X'
+ 124   5                                                                                                                                                              //!< se presiono uno tecla, + 5 segundos
+ 125   5                                                                              break;
+ 126   5                                                                              
+ 127   5                                                                              case 6:                                                                 //!< nos desplazamos al segundo menu
+ 128   5                                                                                              atras_menu = OFF;                               //!< borramos flag
+ 129   5                                                                                              wrt_cmd(LCD_CLEAR);                             //!< borramos la pantalla
+ 130   5                                                                                              wrt_string(mensaje3);                   //!< "1-  <<   2-OK!  "
+ 131   5                                                                                              cursorxy(2,1);                                  //!< corremos el cursor a la segunda fila
+ 132   5                                                                                              wrt_string(mensaje4);                   //!< "3-Salir             "
+ 133   5                                                                                              timer_5s_on;                                    //!< se presiono una tecla, + 5 segundos
+ 134   5                                                                                              while( timer_5s == ON && atras_menu == OFF )                                      
+ 135   5                                                                                              {                                                               //!< bucle hasta 5 seg o se active el timer
+ 136   6                                                                                              actualizar_teclado();                   //!< actualiza el valor de tecla cada 2.5ms
+ 137   6                                                                                              switch( Teclado() )                                                                             
+ 138   6                                                                                              {
+ 139   7                                                                                                                              case 1:                                                 //!< opcion volver al menu anterior
+ 140   7                                                                                                                                              atras_menu = ON;                //!< activamos flag correpondiente
+ 141   7                                                                                                                                              timer_5s_on;                    //!< se ha pulsado una tecla, + 5 segundos
+ 142   7                                                                                                                                              wrt_cmd(LCD_CLEAR);                             //!< borramos la pantalla
+ 143   7                                                                                                                                              wrt_string(mensaje1);                   //!< "1-²C[ ] 2-RH%[ ]"
+ 144   7                                                                                                                                              cursorxy(2,1);                                  //!< corremos el cursor a la segunda fila
+ 145   7                                                                                                                                              wrt_string(mensaje2);                   //!< "3-hPa[ ] 6- ->> "
+ 146   7                                                                                                                                                      //!< actualiza los parametros en pantalla
+ 147   7                                                                                                                                              if(Habilitacion_Mediciones & TEMP)
+ 148   7                                                                                                                                              {
+ 149   8                                                                                                                                               cursorxy(1,6);
+ 150   8                                                                                                                                               wrt_data('X');
+ 151   8                                                                                                                                              }
+ 152   7                                                                                                                                              if(Habilitacion_Mediciones & HUMDDrEL)
+ 153   7                                                                                                                                              {
+ 154   8                                                                                                                                               cursorxy(1,15);
+ 155   8                                                                                                                                               wrt_data('X');
+ 156   8                                                                                                                                              }
+ 157   7                                                                                                                                              if(Habilitacion_Mediciones & PRESaTM)
+ 158   7                                                                                                                                              {
+ 159   8                                                                                                                                               cursorxy(2,7);
+ 160   8                                                                                                                                               wrt_data('X');
+ 161   8                                                                                                                                              }       
+ 162   7                                                                                                                              break;
+ 163   7      
+ 164   7                                                                                                                              case 2:                                                         //!< Confirmamos seleccion 
+ 165   7                                                                                                                                              flag_actualizar = OFF;
+ 166   7                                                                                                                                              menu_display_2();                   //!< Pedimos tiempo entre muestras. Por default devuelve
+ 167   7                                                                                                                                                                                                      //!< t_entre_muestras = 1(min) 
+ 168   7                                                                                                                                              
+ 169   7                                                                                                                                              datos_ingresados = Habilitacion_Mediciones;
+ 170   7                                                                                                                                                                                                              //!< guardamos los parametro ingresados (temp / humm / pres)
+ 171   7                                                                                                                                              datos_ingresados |= 0x60;                         //!< datos de n_de_muestras y t_entre datos ingresados
+ 172   7      
+ 173   7                                                                                                                                              wrt_cmd(LCD_CLEAR);                         //!< borramos la pantalla
+ 174   7                                                                                                                                              wrt_string("Configuracion OK"); //!< "Configuracion OK"
+ 175   7                                                                                                                                              timer_1s_on;                                //!< activamos el timer de 1 segundo
+ 176   7                                                                                                                                              while(timer_1s == ON);          //!< esperamos que pase 1 segundo; solamente para informar
+ 177   7                                                                                                                                                                                                      //!< al usuario de la configuracion
+ 178   7                                                                                                                                              timer_5s = OFF;                 //!< apagamos el timer de 5 segundo para salir
+ 179   7                                                                                                                                              estado = ENVIO_DE_CONFIG;       //!< siguiente estado envio de configuracion a PC
+C51 COMPILER V9.50a   CONFIG_MEDICION                                                      12/12/2012 13:56:51 PAGE 4   
+
+ 180   7                                                                                                                              break;
+ 181   7      
+ 182   7                                                                                                                              case 3:                                                         //!< Salimos del menu y restablemos configuraciones
+ 183   7                                                                                                                                                                                                      //!< anteriores si las hay o por default
+ 184   7                                                                                                                                              flag_actualizar = OFF;          //!< reseteamos para que no escape al envio de configuracion
+ 185   7                                                                                                                                              datos_ingresados = Habilitacion_Mediciones;
+ 186   7                                                                                                                              //!< guardamos los parametro ingresados (temp / humm / pres)
+ 187   7                                                                                                                                              datos_ingresados |= 0x60;                       //!< datos de n_de_muestras y t_entre datos ingresados
+ 188   7                                                                                                                                              wrt_cmd(LCD_CLEAR);                                     //!< borramos la pantalla
+ 189   7                                                                                                                                              wrt_string("Configuracion");            //!< "Configuracion"
+ 190   7                                                                                                                                              cursorxy(2,1);                                          //!< muevo cursor a fila 2
+ 191   7                                                                                                                                              wrt_string("por defecto");                      //!< "por defecto"
+ 192   7                                                                                                                                              timer_1s_on;                                            //!< activo el timer de 1 segundo
+ 193   7                                                                                                                                              while(timer_1s == ON);                          //!< esperamos que pase 1 segundo; solamente para informar
+ 194   7                                                                                                                              //!< al usuario de la configuracion
+ 195   7                                                                                                                                              timer_5s = OFF;                                         //!< desactivamos el timer de 5 segundos para salir
+ 196   7                                                                                                                                              estado = ENVIO_DE_CONFIG;                         //!< siguiente estado envio de configuracion a PC
+ 197   7                                                                                                                              break;                                                                          
+ 198   7                                                                                              }
+ 199   6                                                                                              }
+ 200   5                                                                              break;
+ 201   5                                                               }
+ 202   4                                                              }
+ 203   3                                               break;
+ 204   3      
+ 205   3                                               case 2:
+ 206   3                                                              if (flag_actualizar == ON)                              //!< solo valido cuando es llamado desde TOMA_DE_DATOS
+ 207   3                                                                                                                                              //!< no se envia la nueva config y se sigue con la toma de datos
+ 208   3                                                              {
+ 209   4                                                                      estado = TOMA_DE_DATOS;                         //!< vuelvo al estado TOMA_DE_DATOS sin cambios que informar
+ 210   4                                                                      wrt_cmd(LCD_CLEAR);
+ 211   4                                                                      break;                                                          //!< sale de menu_display
+ 212   4                                                              }
+ 213   3                                                              
+ 214   3                                                              if(datos_ingresados != 0)                               //!< nos fijamos si hay configuracion previa
+ 215   3                                                              {
+ 216   4                                                                      wrt_cmd(LCD_CLEAR);                                     //!< borramos la pantalla
+ 217   4                                                                      wrt_string("Configuracion");            //!< "Configuracion"
+ 218   4                                                                      cursorxy(2,1);                                          //!< muevo cursor a fila 2
+ 219   4                                                                      wrt_string("anterior");                         //!< "por defecto"
+ 220   4                                                                      timer_1s_on;                                            //!< activo el timer de 1 segundo
+ 221   4                                                                      while(timer_1s == ON);                          //!< esperamos que pase 1 segundo; solamente para informar
+ 222   4                                                                                                                                              //!< al usuario de la configuracion
+ 223   4                                                                      timer_5s = OFF;                                         //!< desactivamos el timer de 5 segundos para salir
+ 224   4                                                              }
+ 225   3                                                              else
+ 226   3                                                              {
+ 227   4                                                                      wrt_cmd(LCD_CLEAR);                                     //!< borramos la pantalla
+ 228   4                                                                      wrt_string("Sin Configura-");           //!< "Sin Configura-"
+ 229   4                                                                      cursorxy(2,1);                                          //!< muevo cursor a fila 2
+ 230   4                                                                      wrt_string("-cion");                            //!< "-cion"
+ 231   4                                                                      Habilitacion_Mediciones = 0;
+ 232   4                                                                      timer_1s_on;                                            //!< activo el timer de 1 segundo
+ 233   4                                                                      while(timer_1s == ON);                          //!< esperamos que pase 1 segundo; solamente para informar
+ 234   4                                                                                                                                              //!< al usuario de la configuracion
+ 235   4                                                                      timer_5s = OFF;                                         //!< desactivamos el timer de 5 segundos para salir             
+ 236   4                                                              }
+ 237   3                                               break;
+ 238   3                                                              
+ 239   3              }
+ 240   2        }
+ 241   1        wrt_cmd(LCD_CLEAR);           //!< borro la pantalla 
+C51 COMPILER V9.50a   CONFIG_MEDICION                                                      12/12/2012 13:56:51 PAGE 5   
+
+ 242   1      }
+ 243          
+ 244          /**
+ 245           *      \fn void tildar_casilla ( U8 mensajeX, U8 posicion)
+ 246           *      \brief escribe o borra X de la posicion que le pasas
+ 247           *      \param [ U8 parametro ]                                          
+ 248           *      \return void
+ 249           */
+ 250          void tildar_casilla(U8 parametro)
+ 251          {
+ 252   1                      switch (parametro)
+ 253   1              {
+ 254   2                                                              case TEMP:
+ 255   2                                                                              cursorxy(1,6);
+ 256   2                                                                              if(Habilitacion_Mediciones & TEMP)
+ 257   2                                                                              {
+ 258   3                         wrt_data(' ');
+ 259   3                         Habilitacion_Mediciones &= ~TEMP;
+ 260   3                        }
+ 261   2                                                                              else
+ 262   2                        {
+ 263   3                          wrt_data('X');
+ 264   3                          Habilitacion_Mediciones |= TEMP;
+ 265   3                        }
+ 266   2                                                              break;
+ 267   2                                                              
+ 268   2                                                              case HUMDDrEL:
+ 269   2                                                                        cursorxy(1,15);
+ 270   2                                                                              if(Habilitacion_Mediciones & HUMDDrEL)
+ 271   2                                                                              {
+ 272   3                         wrt_data(' ');
+ 273   3                         Habilitacion_Mediciones &= ~HUMDDrEL;
+ 274   3                        }
+ 275   2                                                                              else
+ 276   2                        {
+ 277   3                          wrt_data('X');
+ 278   3                          Habilitacion_Mediciones |= HUMDDrEL;
+ 279   3                        }
+ 280   2                                                              break;
+ 281   2                                                              
+ 282   2                                                              case PRESaTM:
+ 283   2                                                                         cursorxy(2,7);
+ 284   2                                                                              if(Habilitacion_Mediciones & PRESaTM)
+ 285   2                                                                              {
+ 286   3                         wrt_data(' ');
+ 287   3                         Habilitacion_Mediciones &= ~PRESaTM;
+ 288   3                        }
+ 289   2                                                                              else
+ 290   2                        {
+ 291   3                          wrt_data('X');
+ 292   3                          Habilitacion_Mediciones |= PRESaTM;
+ 293   3                        }
+ 294   2                                                              break;
+ 295   2              }
+ 296   1              timer_5s_on;                   //!< se presiono una tecla, entonces +5 seg      
+ 297   1      }
+ 298          
+ 299          /**
+ 300           *      \fn void menu_display_2 ( void )
+ 301           *      \brief pide los datos de t_entre_muestras y n_de_muestras
+ 302           *      \param void
+ 303           *      \return void
+C51 COMPILER V9.50a   CONFIG_MEDICION                                                      12/12/2012 13:56:51 PAGE 6   
+
+ 304           */
+ 305          void menu_display_2()
+ 306          {
+ 307   1       U8 t_muestras[2]={"01"};                                           //!< cantidad de muestras a tomar
+ 308   1       U8 n_digitos = 0, n_aux = 0;                               //!< n_digitos se desplaza dentro de n-muestras; n_aux auxiliar
+ 309   1       U8 decena = 0, unidad = 0;
+ 310   1       bit flag = OFF;                                                            //!< datos ingresados, al estar activo los datos se ingresaron por defecto.
+ 311   1        
+ 312   1       while(flag == OFF)
+ 313   1       {
+ 314   2               wrt_cmd(LCD_CLEAR);                                        //!< borro la pantalla
+ 315   2               wrt_string("min por muestra");                     //!< "cant de muestras"
+ 316   2               cursorxy(2,1);                                                     //!< muevo el cursor a la segunda fila
+ 317   2               wrt_string("(1-99): --");                                  //!< "(1-99): --"
+ 318   2               cursorxy(2,9);                                                     //!< muevor el cursor a la segunda fila, colum 9
+ 319   2               timer_5s_on;                                                       //!< actvio timer de 5 segundos
+ 320   2               while(timer_5s == ON)                                      //!< para apretar cualquier tecla, sino sale del menu
+ 321   2               {  
+ 322   3                if(n_digitos > 1) {break;}                            //!< si digitos es mayor a 1 sale del while; 2 digitos ingresados
+ 323   3                      actualizar_teclado();                   //!< actualiza el valor de tecla cada 2.5ms
+ 324   3                      n_aux = Teclado();                                              //!< actualizao auxiliar con el valor de tecla
+ 325   3                      if(n_aux != NO_KEY)                                             //!< pregunto si se apreto alguna tecla
+ 326   3                      {                                                                                                                                     //!< en caso verdadero: 
+ 327   4                       t_muestras[n_digitos] = n_aux;                 //!< guardo el valor de tecla
+ 328   4                       wrt_data(t_muestras[n_digitos]+48);    //!< escribo la tecla apretada en pantalla
+ 329   4                       n_digitos++;                                                   //!< incremento digitos
+ 330   4                       timer_5s_on;                                                   //!< se ha presionado una tecla, +5 segundos
+ 331   4                      }
+ 332   3               }
+ 333   2              decena = t_muestras[0];                                                                                 //!< del while se sale si pasaron 5 seg o digitos > 1
+ 334   2              unidad = t_muestras[1]; 
+ 335   2               if(n_digitos > 1)                                                      //!< si digitos > 1 verifico que las teclas esten en el rango de  0 - 9
+ 336   2               {                                                                                                                                      
+ 337   3                if((decena == 0) && (unidad == 0)) decena = 15; //!< tiempo mayor o igual a 5 minutos; 
+ 338   3                                                                                                                                                              //!< escribo muestras[0] para 
+ 339   3                if(decena < 10)                                                                                                       //!< decena < 10
+ 340   3                {
+ 341   4                      if( (decena >= 0) && (unidad < 10) )
+ 342   4                      {
+ 343   5                      t_entre_muestras = (decena * 10) + unidad;      //!< guardamos el valor del usuario en t_entre_muestras_total
+ 344   5                       break;                                                                                                     //!< salimos del while(n_verif == OFF)
+ 345   5                      }                                                                                               //!< 0 < unidad < 10. Unidad no puede ser 0; 
+ 346   4                      else{n_digitos = 0;}                                                    //!< la unidad esta fuera de rango, repetimos el proceso
+ 347   4                }
+ 348   3                else  {n_digitos = 0;}                                                        //!< la decena está fuera de rango. repetimos el proceso
+ 349   3               }
+ 350   2               else                                                                                           //!< pasaron 5 segundos sin apretarse una tecla
+ 351   2               {                                                                                                      //!< cargamos los valores por defecto
+ 352   3                n_de_muestras = N_MUESTRAS_DEFECTO;                           //!< t_entre_muestras y n_muestras_total
+ 353   3                t_entre_muestras = T_ENTRE_MUESTRAS_DEFECTO;
+ 354   3                flag = ON;                                                                            //!< activamos el flag
+ 355   3               } 
+ 356   2       }
+ 357   1      }
+ 358          
+ 359          /**
+ 360           *      \fn unsigned char dni_estacion ( void )
+ 361           *      \brief levanta del puerto 2 el numero de estacion
+ 362           *      \param void
+ 363           *      \return void
+ 364           */
+ 365          
+C51 COMPILER V9.50a   CONFIG_MEDICION                                                      12/12/2012 13:56:51 PAGE 7   
+
+ 366          int numero_de_estacion ( void )
+ 367          {
+ 368   1              U8 dni = 0;
+ 369   1              dni = P2 >> 6;                  //!< así te quedas con el nibble alto en el bajo
+ 370   1          return (HextoInt(dni));
+ 371   1              //return (HextoInt(dni));
+ 372   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    914    ----
+   CONSTANT SIZE    =    203    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      4       6
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       2
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

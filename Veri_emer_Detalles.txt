@@ -1,0 +1,6 @@
+Case Config: Aca se fija que los datos esten puestos, y en caso de ser erroneos o no estar puestos lo muestra
+Case Toma_Datos: Aca tendrai que fijarse que no se haya tildado nada ni entrado en un loop infinito, podriamos tomar a n:muestras
+                 como referencia y si en cierto tiempo no hay mas muestras es que se tildo.
+
+
+

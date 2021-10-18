@@ -1,0 +1,136 @@
+C51 COMPILER V9.50a   TOMAR_MUESTRA                                                        12/12/2012 13:56:51 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE TOMAR_MUESTRA
+OBJECT MODULE PLACED IN tomar_muestra.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE tomar_muestra.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+   2          
+   3          sfr16 ADC0 = 0xBE;
+   4          
+   5          bit flag_actualizar = OFF;
+   6          extern bit flag_tomarMuestra;           //!< variable definida en main.c
+   7          extern bit timer_1s;                                    //!< variable definida en mdt.c
+   8          extern bit timer_2500us;
+   9          extern U8 temperatura;
+  10          //extern U8 temp_dht11;
+  11          //extern U8 humedad_dht11;
+  12          extern U8 presion;
+  13          
+  14          extern U8 estado;                                       //!< variable definida en main.c
+  15          extern U8 tecla;          //!< variable definida en main.c
+  16          extern U8 t_entre_muestras;                     //!< variable definida en config_medicion.c             
+  17          extern U8 tick_muestra;                 //!< variable definida en main.c          
+  18          extern U8 Habilitacion_Mediciones;
+  19          
+  20          /**
+  21           *      \fn bit tomar_muestra ( void ) 
+  22           *      \brief pide las muestras a los sensores y las guarda
+  23           *      \param void
+  24           *      \return bit: 1 si todos las muestras fueron pedidos
+  25                                                                           0 si todavia se estan pidiendo las muestras
+  26           */
+  27          void tomar_muestra()
+  28          {
+  29   1                      bit retorno = OFF;
+  30   1      static  bit flag_T = OFF;
+  31   1      static  U8 estado_sensores = _MPX2200;
+  32   1      
+  33   1      while(retorno == OFF)
+  34   1      {
+  35   2              switch(estado_sensores)
+  36   2              {
+  37   3                      case _MPX2200: 
+  38   3                                              if(AD0BUSY == OFF)
+  39   3                                              {
+  40   4                                              AMX0SL = 0x01;                                          //!< selecciono la entrada del mux AIN0.1
+  41   4                                              ADC0CF |= 0x07;                                         //!< configuro el PGA a 0.5
+  42   4                                              AD0BUSY = ON;                                           //!< incio la conversión
+  43   4                                              flag_T = OFF;
+  44   4                                              estado_sensores = _DHT11;                       //!< cambio al siguiente estado = DHT11                                                 
+  45   4                                              }
+  46   3                      break;
+  47   3      
+  48   3                      case _DHT11:                            
+  49   3                                              if(flag_T == OFF)                                       //!< pregunto si ya se había pasado por acá a un flag testigo
+  50   3                                              {                                                                       //!< llamo a la función para levantar los datos
+  51   4                                                      Medicion_DHT11();                               //!< guardo los datos en el buffer vector_Humedad[n_muestras]
+  52   4                                                      
+  53   4                                                      flag_T = ON;
+  54   4                                              }                                                                       //!< y seteo el flag testigo de conversión
+  55   3                                              if(AD0BUSY == OFF)                                      //!< pregunto si termino la conversión del ADC
+C51 COMPILER V9.50a   TOMAR_MUESTRA                                                        12/12/2012 13:56:51 PAGE 2   
+
+  56   3                                              {                                                       
+  57   4                                                      P5 |= 0x80;                                             //!< testigo
+  58   4                                                      estado_sensores = _LM35;                //!< cambio al siguiente estado = LM35
+  59   4                                              }
+  60   3                                              break;                                                                  
+  61   3      
+  62   3                      case _LM35:
+  63   3                                              AMX0SL = 0x02;                                                                                          //!< selecciono la entrada del mux AIN0.2                                                       
+  64   3                                              ADC0CF &= 0xF8;                                                                                         //!< seteo el PGA = 1
+  65   3                                              P5|=0x40;                                                                                                       //!< testigo
+  66   3                                              estado_sensores = _ESPERO_CONVERSION;                                           //!< cambio al siguiente estado = ESPERO_CONVERSION
+  67   3                                              presion = ADC0/10;                                                              //!< guardo la presión en vector_presion[n_muestras]
+  68   3                                              AD0BUSY = ON;                                                                                           //!< inicio la conversión
+  69   3                      break;
+  70   3      
+  71   3                      case _ESPERO_CONVERSION:
+  72   3                                              if(AD0BUSY == OFF)                                                                                      //!< sí terminó de convertir guardo la conversion
+  73   3                                              {                                                                                                                       //!< sobre su factor de conversion temperatura[n_muestras];
+  74   4                                               AMX0SL = 0x01;                                                                                         //!< selecciono la entrada del mux AIN0.2                                                       
+  75   4                                               ADC0CF |= 0x07;                                                                                        //!< PGA = 0.5
+  76   4                                               temperatura = ADC0 / 13;                                               
+  77   4                                               estado_sensores = _MPX2200;                                                            //!< cambio al estado de inicio = MPX2200
+  78   4                                               P5 |= 0x20;                                                                                            //!< testigo
+  79   4                                               retorno = ON;                                                                                          //!< retorno un 1
+  80   4                                              }
+  81   3                      break;
+  82   3              }
+  83   2       }
+  84   1      }
+  85          
+  86          /**
+  87           *      \fn void actualizar ( void ) 
+  88           *      \brief  Si ticks llego al tiempo entre muestras seteo el flag_tomar para tomar las muestras. 
+  89                                  Cada un segundo actualiza el valor de Tecla. Si hay tecla presionada estado = CONFIG_MEDICION
+  90           *      \param void
+  91           *      \return void
+  92           */
+  93          
+  94          void actualizar()
+  95           { 
+  96   1                      actualizar_teclado();                                   //!< actualiza el valor de Tecla cada 2.5ms
+  97   1                      if(Teclado() != NO_KEY)                                 //!< pregunto si se apretó alguna tecla
+  98   1                      {
+  99   2                      flag_actualizar = ON;                                                   //!< si se apreto una tecla seteo el flag actualizar
+ 100   2                      estado = CONFIG_MEDICION;                                       //!< cambio el estado a CONFIG_MEDICION
+ 101   2                      }                                                                                        
+ 102   1                
+ 103   1                if(tick_muestra >= t_entre_muestras) //!< tiempo de tomar la muestra
+ 104   1                {
+ 105   2                      
+ 106   2                      tick_muestra = 0;                                                                
+ 107   2                       flag_tomarMuestra = ON;
+ 108   2                }
+ 109   1       } 
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    149    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1    ----
+C51 COMPILER V9.50a   TOMAR_MUESTRA                                                        12/12/2012 13:56:51 PAGE 3   
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      2       1
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

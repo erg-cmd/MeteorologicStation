@@ -1,0 +1,18 @@
+"main.obj",
+"inicializacion.obj",
+"barrido_teclado.obj",
+"mdt.obj",
+"isr_timer0.obj",
+"isr_timer2.obj",
+"lcd.obj",
+"isr_uart0.obj",
+"tomar_muestra.obj",
+"adc0.obj",
+"config_medicion.obj",
+"envio_de_config.obj",
+"fw_dht11.obj",
+"manejo_serie.obj",
+"HextoAscii.obj" 
+TO "TPF" 
+RAMSIZE(256) 
+CODE(0x0100 - 0xef00) 

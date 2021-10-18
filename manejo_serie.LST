@@ -1,0 +1,308 @@
+C51 COMPILER V9.50a   MANEJO_SERIE                                                         12/12/2012 13:56:51 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE MANEJO_SERIE
+OBJECT MODULE PLACED IN manejo_serie.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE manejo_serie.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          
+   2          #include "libreria.h"
+   3          
+   4          //---Buffers serie-------------
+   5          
+   6          U8 buffer_Rx[TAM_RX];
+   7          U8 buffer_Tx[TAM_TX];
+   8          U8 in_tx,out_tx,in_rx,out_rx;
+   9          
+  10          //---Variables Externas--------
+  11          extern U16 AUX[];
+  12          extern bit timer_5ms;
+  13          extern bit timer_1s;
+  14          
+  15          extern U8 Habilitacion_Mediciones;      //!< variable definida en config_medicion.c
+  16          extern U8 datos_ingresados;                         //!< variable definida en config_medicion.c
+  17          extern U8 n_de_muestras;                            //!< variable definida en config_medicion.c
+  18          extern U8 t_entre_muestras;                         //!< variable definida en config_medicion.c
+  19          extern U8 estado;                                                 //!< variable definida en main.c
+  20          extern U8 el_buffer[];              //!< variable definida en main.c
+  21          extern U8 temperatura;
+  22          extern U8 temp_dht11;
+  23          extern U8 humedad_dht11;
+  24          extern U8 presion;
+  25          
+  26          /*---Metodos para el manejo del buffer serie--------*/
+  27          
+  28          /**     
+  29                  \fn  void envio_datos ( void )
+  30                  \brief  envia las muestras desde 0 a n_de_muestras
+  31          */
+  32          
+  33          void envio_datos()
+  34          {
+  35   1              static U8 estado_envio = CARGO_BUFFER_TRAMA1;
+  36   1              static U8 contador_envio = 0;
+  37   1              int aux1 = 0;
+  38   1              switch (estado_envio)
+  39   1              
+  40   1              {
+  41   2                              case CARGO_BUFFER_TRAMA1:
+  42   2                                       el_buffer[0] = INICIO_TRAMA;
+  43   2                                       el_buffer[1] = numero_de_estacion();
+  44   2                                       el_buffer[2] = TEMP;
+  45   2                       aux1 = HextoInt (el_buffer[2]);
+  46   2                           el_buffer[2] = aux1;
+  47   2                                       el_buffer[3] = temperatura;
+  48   2                                       aux1 = HextoInt (el_buffer [3]);
+  49   2                              
+  50   2                           if(aux1 == '\0') aux1 = NOpARAM;           //!< seguridad para que no corte la cadena
+  51   2                                       el_buffer[3] = aux1;
+  52   2                                       el_buffer[4] = TEMP_DHT11;
+  53   2                                       aux1 = HextoInt (el_buffer [4]);
+  54   2                           el_buffer[4] = aux1;
+  55   2                                       el_buffer[5] = temp_dht11;
+C51 COMPILER V9.50a   MANEJO_SERIE                                                         12/12/2012 13:56:51 PAGE 2   
+
+  56   2                                       aux1 = HextoInt (el_buffer [5]);
+  57   2                              
+  58   2                           if(aux1 == '\0') aux1 = NOpARAM;           //!< seguridad para que no corte la cadena
+  59   2                                       el_buffer[5] = aux1;
+  60   2                                       el_buffer[6] = el_buffer[1] + el_buffer[2] + el_buffer[3] + el_buffer[4] + el_buffer[5];
+  61   2                                       aux1 = HextoInt (el_buffer [6]);
+  62   2                           if(aux1 == '\0') aux1 = NOpARAM;           //!< seguridad para que no corte la cadena
+  63   2                                       el_buffer[6] = aux1;
+  64   2                                       el_buffer[7] = FIN_TRAMA;
+  65   2                                       el_buffer[8] = '\0';
+  66   2                                       
+  67   2                                       MandarDato(el_buffer);                                 //!< cargo la trama en el buffer de transmision
+  68   2                                       estado_envio = ESPERO_ENVIO_TRAMA;             //!< cambio al estado espero envio de trama ( fin del envio )
+  69   2                              break;
+  70   2                              
+  71   2                              case CARGO_BUFFER_TRAMA2:
+  72   2                                       el_buffer[0] = INICIO_TRAMA;
+  73   2                                       el_buffer[1] = numero_de_estacion();
+  74   2                                       el_buffer[2] = PRESaTM;
+  75   2                                       aux1 = HextoInt (el_buffer [2]);
+  76   2                           el_buffer[2] = aux1;
+  77   2                                       el_buffer[3] = presion;
+  78   2                                       aux1 = HextoInt (el_buffer [3]);
+  79   2                           if(aux1 == '\0') aux1 = NOpARAM;           //!< seguridad para que no corte la cadena
+  80   2                                       el_buffer[3] = aux1;
+  81   2                                       el_buffer[4] = HUMDDrEL;
+  82   2                                       aux1 = HextoInt (el_buffer [4]);
+  83   2                           el_buffer[4] = aux1;
+  84   2                                       el_buffer[5] = humedad_dht11;
+  85   2                                       aux1 = HextoInt (el_buffer [5]);
+  86   2                           if(aux1 == '\0') aux1 = NOpARAM;           //!< seguridad para que no corte la cadena
+  87   2                                       el_buffer[5] = aux1;
+  88   2                                       el_buffer[6] = el_buffer[1] + el_buffer[2] + el_buffer[3] + el_buffer[4] + el_buffer[5];
+  89   2                                       aux1 = HextoInt (el_buffer [6]);
+  90   2                           if(aux1 == '\0') aux1 = NOpARAM;           //!< seguridad para que no corte la cadena
+  91   2                                       el_buffer[6] = aux1;
+  92   2                                       el_buffer[7] = FIN_TRAMA;
+  93   2                                       el_buffer[8] = '\0';
+  94   2                                       
+  95   2                                       MandarDato(el_buffer);                         //!< cargo la trama en el buffer de transmision
+  96   2                                       estado_envio = ESPERO_ENVIO_TRAMA;             //!< cambio al estado espero envio de trama ( fin del envio )
+  97   2                              break;
+  98   2                              
+  99   2      
+ 100   2                              case ESPERO_ENVIO_TRAMA:
+ 101   2                                              if(in_tx == out_tx)             //!< no hay mas datos que enviar
+ 102   2                                              {
+ 103   3                                               contador_envio++;
+ 104   3                                               if(contador_envio == 2)
+ 105   3                                               {
+ 106   4                                                contador_envio = 0;
+ 107   4                                                estado = TOMA_DE_DATOS;
+ 108   4                                               }
+ 109   3                                              
+ 110   3                                              if(contador_envio == 0 ) estado_envio = CARGO_BUFFER_TRAMA1;
+ 111   3                                              if(contador_envio == 1 ) estado_envio = CARGO_BUFFER_TRAMA2;
+ 112   3                                              
+ 113   3                                              timer_1s_on;
+ 114   3                                              while(timer_1s == ON);
+ 115   3                                              }
+ 116   2                              break;
+ 117   2              
+C51 COMPILER V9.50a   MANEJO_SERIE                                                         12/12/2012 13:56:51 PAGE 3   
+
+ 118   2              }
+ 119   1      }
+ 120          
+ 121          
+ 122          
+ 123          
+ 124          /**
+ 125           *      \fn void Pop_Recibir ( unsigned char)
+ 126           *      \brief Toma un byte de la cola circular BUfferRecepcion
+ 127           *      \param void
+ 128           *      \return dato si la cola tiene elementos y -1 si está vacio
+ 129           */
+ 130          
+ 131          int PopRecepcion (void)
+ 132          {
+ 133   1       int aux;
+ 134   1       aux = buffer_Rx[out_rx];
+ 135   1       out_rx++;
+ 136   1       out_rx %= TAM_RX;
+ 137   1       return aux;
+ 138   1      
+ 139   1      }
+ 140          
+ 141          
+ 142          /**     
+ 143                  \fn  bit HayDato ( void )
+ 144                  \brief Indica si hay datos disponibles para leer en el buffer de recepcion
+ 145          */
+ 146          
+ 147          bit HayDato ( void )
+ 148          {
+ 149   1              return ( in_rx != out_rx );
+ 150   1      }
+ 151          
+ 152          /**     
+ 153                  \fn  void RecibirTrama ( void )
+ 154                  \brief  si hay datos en el buffer de recepcion 
+ 155                                  levanto la trama y elijo entre configurar y enviar datos
+ 156          */
+ 157          
+ 158          void RecibirTrama ()
+ 159          {
+ 160   1       static U8 estado_recepcion = ESPERO_HEADER;
+ 161   1      
+ 162   1       if(HayDato())                                          //!< pregunto si hay datos en el buffer de recepcion
+ 163   1       {                                                                      
+ 164   2              el_buffer[0]    = PopRecepcion();                       //!< guardo el byte recibido en el_buffer[0]
+ 165   2              switch (estado_recepcion)
+ 166   2              {
+ 167   3                                      case ESPERO_HEADER:
+ 168   3                                                      if(el_buffer[0] == INICIO_TRAMA)
+ 169   3                                                      {
+ 170   4                                                      estado_recepcion = LEVANTO_TRAMA;
+ 171   4                                                      el_buffer[14] = 8;                                                      //!< reseteo el contador de bytes
+ 172   4                                                      }
+ 173   3                                      break;
+ 174   3                                      
+ 175   3                                      case LEVANTO_TRAMA:
+ 176   3                                              el_buffer[ el_buffer[14] ] = el_buffer[0];
+ 177   3                                              el_buffer[14]++;
+ 178   3                                              if (el_buffer[14]  > 13)                            //!< en la posicion 13 guardo el checksum recibido
+ 179   3                                              {
+C51 COMPILER V9.50a   MANEJO_SERIE                                                         12/12/2012 13:56:51 PAGE 4   
+
+ 180   4                                               el_buffer[0] = el_buffer[8] + el_buffer[9] + el_buffer[10] + el_buffer[11] + el_buffer[12]; //!< cal
+             -culo el checksum
+ 181   4                                               if(el_buffer[13] == el_buffer[0])                      //!< la trama se levanto correctamente
+ 182   4                                               {
+ 183   5                                                estado_recepcion = CARGO_CONFIG;      //!< cargamos la configuracion
+ 184   5                                                SendAck();                                            //!< trama reconocida
+ 185   5                                               }
+ 186   4                                               else 
+ 187   4                                               {
+ 188   5                                                estado_recepcion = ESPERO_HEADER;     //!< volvemos a esperar el inicio de trama
+ 189   5                                                SendNack();                                           //!< trama no reconicida
+ 190   5                                               }
+ 191   4                                              }
+ 192   3                                      break;
+ 193   3                                      
+ 194   3                                      case CARGO_CONFIG:                                                                      //!< entramos acá con el byte de fin de trama
+ 195   3                                                      if( el_buffer[8] == numero_de_estacion() )
+ 196   3                                                      {
+ 197   4                                                      t_entre_muestras = el_buffer[10];                       //!< cargo el tiempo entre muestras
+ 198   4                                                      n_de_muestras = el_buffer[11];                  //!< cargo el numero de muestras
+ 199   4                                                      Habilitacion_Mediciones =  el_buffer[12];       //!< cargo los parametros a medir
+ 200   4                                                      datos_ingresados = Habilitacion_Mediciones;     //!< dejamos grabada la nueva configuracion
+ 201   4                                                      estado_recepcion = ESPERO_HEADER;                       //!< seteo el estado_recepcion para su proximo ingreso
+ 202   4                                                      }
+ 203   3                                      break;   
+ 204   3              }
+ 205   2       }
+ 206   1      }
+ 207          
+ 208          
+ 209          /**
+ 210                  \fn  void MandarDato ( char *)
+ 211                  \brief Escribe en el buffer de transmision una cadena (terminada en '\0')
+ 212                  
+ 213          */
+ 214          
+ 215          void MandarDato ( char * msg )
+ 216          {
+ 217   1      
+ 218   1              bit mandar;
+ 219   1              int i;
+ 220   1          
+ 221   1              
+ 222   1              
+ 223   1              //!<Si in_tx es igual a out_tx significa que ya se mandaron todos los datos de una trama anterior:
+ 224   1              mandar = (in_tx == out_tx);
+ 225   1          
+ 226   1              
+ 227   1              for(i = 0 ; msg[i] ; i++ )
+ 228   1              {
+ 229   2                      buffer_Tx[in_tx] = msg[i];
+ 230   2                      in_tx ++;
+ 231   2                      in_tx %= TAM_TX;
+ 232   2              }
+ 233   1              //!<Si no se estan mandando datos FUERZO una interrupcion para mandar el primero:
+ 234   1              if ( mandar )
+ 235   1                      TI0 = 1;
+ 236   1      
+ 237   1      }
+ 238          
+ 239          /**     
+ 240                  \fn  void SendAck ( void )
+C51 COMPILER V9.50a   MANEJO_SERIE                                                         12/12/2012 13:56:51 PAGE 5   
+
+ 241                  \brief Arma la trama de respuesta correspondiente a TRAMA VALIDA
+ 242          
+ 243          */
+ 244          
+ 245          void SendAck ( void )
+ 246          {
+ 247   1              el_buffer[0] = INICIO_TRAMA;
+ 248   1              el_buffer[1] = 'A';
+ 249   1              el_buffer[2] = 'C';
+ 250   1              el_buffer[3] = 'K';
+ 251   1              el_buffer[4] = el_buffer[0] + el_buffer[1] + el_buffer[2] + el_buffer[3];
+ 252   1              el_buffer[5] = FIN_TRAMA;
+ 253   1              el_buffer[6] = '\0';
+ 254   1              
+ 255   1              MandarDato( el_buffer );
+ 256   1      }
+ 257          
+ 258          /**     
+ 259                  \fn  void SendNack ( void )
+ 260                  \brief Arma la trama de respuesta correspondiente a TRAMA NO VALIDA
+ 261          
+ 262          */
+ 263          
+ 264          void SendNack ( void )
+ 265          {
+ 266   1              el_buffer[0] = INICIO_TRAMA;
+ 267   1              el_buffer[1] = 'N';
+ 268   1              el_buffer[2] = 'A';
+ 269   1              el_buffer[3] = 'C';
+ 270   1              el_buffer[4] = 'K';
+ 271   1              el_buffer[5] = el_buffer[0] + el_buffer[1] + el_buffer[2] + el_buffer[3] + el_buffer[4];
+ 272   1              el_buffer[6] = FIN_TRAMA;
+ 273   1              el_buffer[7] = '\0';
+ 274   1          
+ 275   1              MandarDato( el_buffer );
+ 276   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    622    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     37       5
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----       1
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

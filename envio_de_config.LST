@@ -1,0 +1,147 @@
+C51 COMPILER V9.50a   ENVIO_DE_CONFIG                                                      12/12/2012 13:56:51 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE ENVIO_DE_CONFIG
+OBJECT MODULE PLACED IN envio_de_config.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE envio_de_config.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include "libreria.h"
+   2          
+   3          /*-
+   4          Trama de config:
+   5          _________________________________________________________________________________
+   6           #  | n de estacion | config | t_entre_muestras| n_de_muestras| parametros | chksm| $
+   7          =================================================================================
+   8          
+   9          # - inicio de trama
+  10          n_de_estacion : numero de estacion que envia\recibe la informacion
+  11          config: si este byte es 0xF0, entonces los datos siguientes son de configuracion
+  12          t_entre_muestras: tiempo entre muestras
+  13          n_de_muestras: numero de muestras
+  14          parametros:  si el bit 0 esta en 1 interesa la toma de temperatura
+  15                                  si el bit 1 esta en 1 interesa la toma de humedad
+  16                                  si el bit 2 esta en 1 interesa la toma de presión
+  17          chksm: checksum la suma de los bytes anteriores sin contar el inicio de trama
+  18          $: fin de trama
+  19          -*/
+  20          
+  21          
+  22          /**
+  23           *      \fn void envio_de_config ( void )
+  24           *      \brief envia la configuracion a la PC cada 1 segundos
+  25                                  espera respuesta de la PC tipo "#ACK(checksum)$"
+  26           *      \param void
+  27           *      \return void
+  28           */
+  29          
+  30          //Variable Externas
+  31          extern U16 AUX[];                                                       // variable definida en mdt.c
+  32          extern bit timer_1s;
+  33          extern U8 n_de_muestras;                                        //!< variable declarada en config_medicion.c
+  34          extern U8 t_entre_muestras;                                     //!< variable declarada en config_medicion.c
+  35          extern U8 Habilitacion_Mediciones;                      //!< variable declarada en config_medicion.c
+  36          extern U8 estado;                                                       //!< variable declarada en main.c
+  37          extern U8 buffer_Rx[];                                          //!< variable declarada en manejo_serie.c
+  38          extern U8 buffer_Tx[];                                          //!< variable declarada en manejo_serie.c
+  39          extern U8 in_tx,out_tx,in_rx,out_rx;            //!< variable declarada en manejo_serie.c
+  40          extern U8 el_buffer[];
+  41          
+  42          void envio_de_config (void)
+  43           {
+  44   1        static U8 estado_envio = LLENO_BUFFER;        //!< seteo el estado inicial del switch(estado_envio)
+  45   1        int aux = 0;
+  46   1        switch (estado_envio)
+  47   1        {
+  48   2                                              case LLENO_BUFFER:              //!< cargo el buffer con los valores de configuracion actuales
+  49   2                                                                       
+  50   2                                                      el_buffer[0] = INICIO_TRAMA;
+  51   2                                                      el_buffer[1] = numero_de_estacion();
+  52   2                                                      el_buffer[2] = TRAMA_CONFIG;
+  53   2                                                      el_buffer[3] = t_entre_muestras;
+  54   2                                                      el_buffer[4] = n_de_muestras;
+  55   2                                              el_buffer[5] = Habilitacion_Mediciones;
+C51 COMPILER V9.50a   ENVIO_DE_CONFIG                                                      12/12/2012 13:56:51 PAGE 2   
+
+  56   2                                              aux = HextoInt (el_buffer [5]);
+  57   2                                  el_buffer [5] = aux;
+  58   2                                              el_buffer[6] = el_buffer[1] + el_buffer[2] + el_buffer[3] + el_buffer[4] + el_buffer[5];
+  59   2                                                  aux = HextoInt (el_buffer [6]);
+  60   2                                  el_buffer [6] = aux;
+  61   2                                                      el_buffer[7] = FIN_TRAMA;
+  62   2                                                      el_buffer[8] =  '\0';
+  63   2                                                      el_buffer[10] = 0;                 //!< inicio el contador
+  64   2                                                      
+  65   2                                                      MandarDato( el_buffer );
+  66   2                                                      estado_envio = MANDO_TRAMA;                                     //!< terminado el llenado del buffer, cambio al siguiente estado
+  67   2                                              
+  68   2                                              break;
+  69   2                                              
+  70   2                                              case MANDO_TRAMA:
+  71   2                                                       if(in_tx == out_tx)                                            //!< preguntamos si se termino de enviar la trama
+  72   2                                                       {
+  73   3                                                              timer_1s_on;                                            //!< activo el flag de 1 segundo para que la PC responda
+  74   3                                                              estado_envio = ESPERO_RTA;                      //!< cargo el siguiente estado, espero rta de la PC
+  75   3                                                       }
+  76   2                                                       
+  77   2                                              break;
+  78   2      
+  79   2                                              case ESPERO_RTA:                                                                //!< espero contestacion de la PC
+  80   2                                                       
+  81   2                                                       if (timer_1s == OFF)                                           //!< si se cumplió 1 segundo sin respuesta
+  82   2                                                       {
+  83   3                                                       el_buffer[10] = 0;                                             //!< reseteo contador
+  84   3                                                       estado_envio = LLENO_BUFFER;                           //!< volvemos al estado de LLENO_BUFFER
+  85   3                                                       break;                                                                         //!< salgo del case
+  86   3                                                       }
+  87   2                                                       
+  88   2                                                      if( HayDato() )                                                                 //!< preguntamos si hay nuevos datos en buffer rx
+  89   2                                                      {
+  90   3                                                       el_buffer[ el_buffer[10] ] = PopRecepcion();   //!< pongo el byte recibido en un array
+  91   3                                                       if( el_buffer[0] != INICIO_TRAMA ) {break;}    //!< me fijo si es el inicio de trama
+  92   3                                                       el_buffer[10]++;                                                               //!< incremento el nro de bytes recibidos
+  93   3                                                      }                                               
+  94   2      
+  95   2                                                       if( el_buffer[10] == 5 )                                               //!< se han recibido los 5 bytes
+  96   2                                                       {
+  97   3                                                              el_buffer[11] = 0;                                                      //!< reseto variable contador
+  98   3                                                               
+  99   3                                                              if(el_buffer[0] == INICIO_TRAMA)el_buffer[11]++;//!< si los bytes son los correspondientes con #ACK
+             -(chk)$
+ 100   3                                                              if(el_buffer[1] == 'A')el_buffer[11]++;          //!< contador es 6 de otra manera contador es menor a 6
+ 101   3                                                              if(el_buffer[2] == 'C')el_buffer[11]++;          //!< entonces los datos no fueron bien recibidos; se los 
+             -envia de nuevo
+ 102   3                                                              if(el_buffer[3] == 'K')el_buffer[11]++; 
+ 103   3                                                              if(el_buffer[4] == FIN_TRAMA)el_buffer[11]++;
+ 104   3      
+ 105   3                                                              if(el_buffer[11] == 5 )                                                 //!< si contador es 5 la trama fue bien recibida por la PC
+ 106   3                                                                      {
+ 107   4                                                                       estado = TOMA_DE_DATOS;                                        //!< cambio el estado de la maquina de estados
+ 108   4                                                                       estado_envio = LLENO_BUFFER;                           //!< dejo a estado_envio en su estado inicial
+ 109   4                                                                      }
+ 110   3                                                               else                                                                                   //!< la trama fue mal recibida entonces la volvemos a envia
+ 111   3                                                                      {
+ 112   4                                                                       estado_envio = LLENO_BUFFER;                           //!< vuelvo al estado inicial, lleno denuevo el buffer
+ 113   4                                                                      }
+ 114   3                                                               el_buffer[10] = 0;
+ 115   3                                                       }                                                                      
+C51 COMPILER V9.50a   ENVIO_DE_CONFIG                                                      12/12/2012 13:56:51 PAGE 3   
+
+ 116   2                                              break;
+ 117   2        }
+ 118   1       }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    195    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      1    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
